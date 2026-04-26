@@ -2,7 +2,7 @@
 
 Phase 1 - Scalar Fourier Optics MVP.
 Phase 3 - Defocus sign convention and DOF groundwork.
-Phase 5 - Threshold resist MVP and end-to-end metrics.
+Phase 5 - Threshold and Gaussian-blur resist metrics.
 """
 
 __version__ = "0.1.0"

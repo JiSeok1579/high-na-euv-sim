@@ -15,6 +15,7 @@ from src.metrics import (
     normalized_image_log_slope,
 )
 from src.pupil import PupilSpec
+from src.resist_blur import blurred_threshold_resist
 from src.resist_threshold import threshold_resist
 
 
@@ -52,3 +53,33 @@ def test_phase1_phase3_phase5_mvp_end_to_end_pipeline():
         target_cd,
         threshold=0.2,
     ) > 1.0
+
+
+def test_phase5_l1_blurred_pipeline_keeps_resolved_cd_within_tolerance():
+    """Gaussian blur integrates into the same end-to-end metric path."""
+    pitch_m = 80e-9
+    grid = MaskGrid(nx=512, ny=64, pixel_size=1e-9)
+    pattern = line_space_pattern(grid, pitch_m=pitch_m, duty_cycle=0.5)
+    mask = kirchhoff_mask(pattern)
+
+    aerial, wafer = focus_drilling_average(
+        mask,
+        grid,
+        [0.0],
+        pupil_spec=PupilSpec(grid_size=512, na=C.NA_HIGH, obscuration_ratio=0.0),
+        anamorphic=False,
+    )
+    printed = blurred_threshold_resist(
+        aerial,
+        wafer.pixel_x_m,
+        sigma_m=2e-9,
+        dose=1.0,
+        threshold=0.2,
+    )
+
+    cy = wafer.ny // 2
+    target_clear = pattern[cy, :] == 0.0
+    target_cd = critical_dimension(target_clear, grid.pixel_size)
+    printed_cd = critical_dimension(printed[cy, :], wafer.pixel_x_m)
+
+    assert abs(printed_cd - target_cd) / target_cd <= 0.10

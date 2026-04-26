@@ -1,21 +1,22 @@
-# Phase 5 - Threshold Resist MVP
+# Phase 5 - Resist Models
 
 ## 1. Scope
 
-Phase 5 MVP closes the first full mask-to-print pipeline:
+Phase 5 closes the first full mask-to-print pipeline and then refines the
+resist model by levels:
 
 ```text
 line/space mask -> aerial image -> focus slice -> threshold resist -> CD/EPE
 ```
 
-The resist model is deliberately Level 0. A pixel is exposed when:
+Level 0 is threshold resist. A pixel is exposed when:
 
 ```text
 dose * I(x, y) > threshold
 ```
 
-Chemical blur, depth-resolved development, and stochastic LWR are deferred to
-Phase 5 L1-L3.
+Level 1 adds a Gaussian chemical blur approximation before thresholding.
+Depth-resolved development and stochastic LWR remain deferred to Phase 5 L2-L3.
 
 ## 2. Implemented Functions
 
@@ -23,6 +24,10 @@ Phase 5 L1-L3.
 |----------|------|
 | `threshold_resist(...)` | Converts a normalized aerial image into a boolean exposed map. |
 | `dose_to_clear(...)` | Computes the scalar dose needed to clear a pixel at a given intensity. |
+| `gaussian_kernel_1d(...)` | Builds a normalized 1-D Gaussian blur kernel from sigma and pixel size. |
+| `gaussian_blur(...)` | Applies separable Gaussian blur to a 1-D line or 2-D aerial image. |
+| `blurred_threshold_resist(...)` | Applies Level 1 blur before threshold resist. |
+| `transition_width(...)` | Measures deterministic edge-spread width between two normalized intensity levels. |
 | `critical_dimension(...)` | Measures mean foreground run width on a 1-D printed line. |
 | `edge_positions(...)` | Extracts binary transition edges for EPE measurement. |
 | `mean_absolute_epe(...)` | Compares printed and target edge positions. |
@@ -42,19 +47,29 @@ The Phase 5 MVP tests cover:
 - resolved line/space target CD within 10%
 - Phase 1 + Phase 3 + Phase 5 end-to-end pipeline
 
-Current MVP target:
+The Phase 5 L1 tests cover:
+
+- Gaussian kernel normalization and symmetry
+- constant-dose preservation after blur
+- larger sigma broadening deterministic edge spread
+- sigma `0` reducing exactly to Level 0 threshold resist
+- blurred end-to-end CD staying within the MVP 10% tolerance
+
+Current targets:
 
 | Case | Target | Result |
 |------|--------|--------|
 | 80 nm pitch, 50% duty | 40 nm clear CD | <= 10% CD error |
 | Dose sweep | exposed CD monotonic with dose | PASS |
-| End-to-end | mask -> printed pattern | PASS |
+| End-to-end L0 | mask -> printed pattern | PASS |
+| End-to-end L1 | mask -> Gaussian blur -> printed pattern | PASS |
+| Edge spread | larger sigma -> wider transition band | PASS |
 
 ## 4. Limitations
 
 | ID | Limitation | Deferred To |
 |----|------------|-------------|
-| P5-L1 | No acid/quencher diffusion or post-exposure bake blur. | Phase 5 L1 |
+| P5-L1 | Gaussian blur is deterministic and isotropic; no separate acid/quencher diffusion chemistry. | Phase 5 L1 calibration |
 | P5-L2 | No depth-resolved resist stack or focus-depth coupling. | Phase 5 L2 |
 | P5-L3 | No stochastic photon/chemistry Monte Carlo or LWR distribution. | Phase 5 L3 |
 | P5-L4 | Printed output is a boolean exposed map, not a developed 3-D resist profile. | Phase 5 L2-L3 |
@@ -63,4 +78,5 @@ Current MVP target:
 
 KPI K1 is complete for the MVP pipeline. The simulator can now propagate a
 line/space mask through aerial imaging, Phase 3 focus handling, threshold
-resist, and CD/EPE metrics.
+resist, Gaussian blur, and CD/EPE metrics. Phase 5 L1 Part 01 is complete for
+deterministic blur plumbing; stochastic LWR remains a later Level 3 target.

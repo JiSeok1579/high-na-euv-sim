@@ -17,7 +17,8 @@ dose * I(x, y) > threshold
 
 Level 1 adds a Gaussian chemical blur approximation before thresholding.
 Level 2 adds depth-resolved dose attenuation, focus-depth coupling, and a
-deterministic profile/SWA proxy. Stochastic LWR remains deferred to Phase 5 L3.
+deterministic profile/SWA proxy. Level 3 adds a reduced stochastic Monte Carlo
+chain and dose-dependent LWR budget.
 
 ## 2. Implemented Functions
 
@@ -38,6 +39,10 @@ deterministic profile/SWA proxy. Stochastic LWR remains deferred to Phase 5 L3.
 | `depth_cd_profile(...)` | Extracts center-line CD and exposed fraction for each resist depth. |
 | `sidewall_angle_proxy(...)` | Converts through-resist CD taper into a deterministic SWA proxy. |
 | `focus_depth_resolved_resist(...)` | Runs focus-coupled aerial slices and depth-resolved thresholding. |
+| `stochastic_resist(...)` | Runs one photon → secondary electron → acid → deprotection → dissolution trial. |
+| `monte_carlo_lwr_curve(...)` | Aggregates seeded stochastic CD/LWR/LCDU over a dose sweep. |
+| `lwr_decomposition_budget(...)` | Reports optical/material/cross LWR variance terms. |
+| `stochastic_lwr_m(...)` | Converts Monte Carlo CD samples into a 3σ LWR estimate. |
 | `critical_dimension(...)` | Measures mean foreground run width on a 1-D printed line. |
 | `edge_positions(...)` | Extracts binary transition edges for EPE measurement. |
 | `mean_absolute_epe(...)` | Compares printed and target edge positions. |
@@ -85,6 +90,15 @@ The Phase 5 L2 Part 02 tests cover:
 - profile metadata validation for stack/depth/line-index consistency
 - `focus_depth_resolved_resist(...)` output feeding the profile/SWA proxy path
 
+The Phase 5 L3 Part 01 tests cover:
+
+- stochastic chain dose response from photon counts through deprotection
+- material-threshold variability toggle
+- seeded Monte Carlo reproducibility for CD/LWR samples
+- optical/material/cross LWR budget with qualitative smile shape
+- exported 3σ LWR sample convention
+- invalid stochastic dose, shape, trial, and parameter rejection
+
 Current targets:
 
 | Case | Target | Result |
@@ -97,15 +111,16 @@ Current targets:
 | L1 sweep | sigma-dose -> CD/EPE/LWR proxy table | PASS |
 | L2 depth | focus-depth slices -> dose/exposure stack | PASS |
 | L2 profile | depth exposure stack -> CD/SWA proxy | PASS |
+| L3 stochastic | seeded MC -> CD/LWR/LCDU + budget | PASS |
 
 ## 4. Limitations
 
 | ID | Limitation | Deferred To |
 |----|------------|-------------|
 | P5-L1 | Gaussian blur is deterministic and isotropic; no separate acid/quencher diffusion chemistry. | Phase 5 L1 calibration |
-| P5-L5 | LWR proxy is deterministic `transition_width / sqrt(dose)`, not Monte Carlo LWR. | Phase 5 L3 |
+| P5-L5 | L1 sweep LWR proxy is deterministic; L3 MC LWR remains reduced and uncalibrated. | Phase 5 L3 calibration |
 | P5-L2 | SWA is a deterministic CD-taper proxy, not a calibrated dissolution/profile simulator. | Phase 5 L2 calibration |
-| P5-L3 | No stochastic photon/chemistry Monte Carlo or LWR distribution. | Phase 5 L3 |
+| P5-L3 | Stochastic chain is reduced and calibrated qualitatively, not first-principles molecular MC. | Phase 5 L3 calibration |
 | P5-L4 | Printed output is a boolean exposed map plus profile metrics, not a developed 3-D resist volume. | Phase 5 L2-L3 |
 
 ## 5. Exit Status
@@ -114,4 +129,6 @@ KPI K1 is complete for the MVP pipeline. The simulator can now propagate a
 line/space mask through aerial imaging, Phase 3 focus handling, threshold
 resist, Gaussian blur, depth-resolved dose, and CD/EPE metrics. Phase 5 L2
 Part 02 adds a deterministic through-resist CD profile and SWA proxy; calibrated
-dissolution geometry and stochastic LWR remain later targets.
+dissolution geometry remains a later target. Phase 5 L3 Part 01 adds seeded
+stochastic trials, CD/LWR/LCDU summaries, and a qualitative optical/material
+LWR budget.

@@ -1,0 +1,142 @@
+"""Phase 5 Level 3 tests for stochastic resist LWR MVP."""
+
+from __future__ import annotations
+
+import numpy as np
+import pytest
+
+from src.resist_stochastic import (
+    StochasticResistParams,
+    lwr_decomposition_budget,
+    monte_carlo_lwr_curve,
+    stochastic_lwr_m,
+    stochastic_resist,
+)
+
+
+def test_stochastic_resist_chain_tracks_aerial_dose_response():
+    """Photon/acid/deprotection means should rise with aerial intensity."""
+    aerial = np.concatenate(
+        [
+            np.full(256, 0.10),
+            np.full(256, 0.80),
+        ]
+    )
+    exposure = stochastic_resist(
+        aerial,
+        dose=1.0,
+        params=StochasticResistParams(
+            photon_density_per_unit=600.0,
+            material_threshold_sigma=0.0,
+        ),
+        rng=np.random.default_rng(20260426),
+    )
+
+    low = slice(0, 256)
+    high = slice(256, 512)
+    assert exposure.photon_count.shape == aerial.shape
+    assert exposure.printed.dtype == np.bool_
+    assert float(np.mean(exposure.photon_count[high])) > float(
+        np.mean(exposure.photon_count[low])
+    )
+    assert float(np.mean(exposure.acid_count[high])) > float(
+        np.mean(exposure.acid_count[low])
+    )
+    assert float(np.mean(exposure.deprotection_fraction[high])) > float(
+        np.mean(exposure.deprotection_fraction[low])
+    )
+    assert np.any(exposure.printed[high])
+
+
+def test_zero_material_sigma_uses_constant_clearing_threshold():
+    """Turning off material variability should leave only chain shot noise."""
+    params = StochasticResistParams(material_threshold_sigma=0.0)
+    exposure = stochastic_resist(
+        np.full((4, 5), 0.5),
+        params=params,
+        rng=np.random.default_rng(7),
+    )
+
+    assert np.allclose(exposure.clearing_threshold_map, params.clearing_threshold)
+
+
+def test_monte_carlo_lwr_curve_is_reproducible_with_seed():
+    """Seeded trials should emit stable CD/LWR samples for regression use."""
+    params = StochasticResistParams(
+        photon_density_per_unit=500.0,
+        material_threshold_sigma=0.01,
+    )
+    first = monte_carlo_lwr_curve(
+        _soft_line(),
+        pixel_size_m=1e-9,
+        doses=[0.8, 1.0],
+        trials=24,
+        params=params,
+        seed=1234,
+    )
+    second = monte_carlo_lwr_curve(
+        _soft_line(),
+        pixel_size_m=1e-9,
+        doses=[0.8, 1.0],
+        trials=24,
+        params=params,
+        seed=1234,
+    )
+
+    assert first == second
+    assert [point.dose for point in first] == [0.8, 1.0]
+    assert all(point.trials == 24 for point in first)
+    assert all(point.mean_cd_m > 0.0 for point in first)
+    assert all(point.lwr_m >= 0.0 for point in first)
+    assert first[0].lwr_m == pytest.approx(
+        stochastic_lwr_m(first[0].cd_samples_m)
+    )
+
+
+def test_lwr_budget_reproduces_optical_material_smile_shape():
+    """Optical LWR falls with dose while material LWR grows at high dose."""
+    low = lwr_decomposition_budget(0.5, cd_m=36e-9)
+    nominal = lwr_decomposition_budget(1.0, cd_m=36e-9)
+    high = lwr_decomposition_budget(2.0, cd_m=36e-9)
+
+    assert low.optical_lwr_m > nominal.optical_lwr_m > high.optical_lwr_m
+    assert low.material_lwr_m < nominal.material_lwr_m < high.material_lwr_m
+    assert low.cross_term_m2 < 0.0
+    assert nominal.total_lwr_m < low.total_lwr_m
+    assert nominal.total_lwr_m < high.total_lwr_m
+
+
+def test_stochastic_lwr_uses_three_sigma_sample_width():
+    """The exported helper should match the explicit 3-sigma convention."""
+    samples = [20e-9, 21e-9, 19e-9, 22e-9]
+
+    assert stochastic_lwr_m(samples) == pytest.approx(
+        3.0 * float(np.std(samples, ddof=1))
+    )
+
+
+def test_stochastic_resist_rejects_invalid_inputs():
+    """Invalid physical parameters should fail before Monte Carlo execution."""
+    with pytest.raises(ValueError, match="non-negative"):
+        stochastic_resist(np.array([-0.1, 0.2]))
+    with pytest.raises(ValueError, match="dose"):
+        stochastic_resist(np.ones(4), dose=0.0)
+    with pytest.raises(ValueError, match="photon_density_per_unit"):
+        stochastic_resist(
+            np.ones(4),
+            params=StochasticResistParams(photon_density_per_unit=0.0),
+        )
+    with pytest.raises(ValueError, match="trials"):
+        monte_carlo_lwr_curve(np.ones(8), 1e-9, [1.0], trials=1)
+    with pytest.raises(ValueError, match="1-D"):
+        monte_carlo_lwr_curve(np.ones((2, 2)), 1e-9, [1.0], trials=2)
+    with pytest.raises(ValueError, match="at least two"):
+        stochastic_lwr_m([20e-9])
+
+
+def _soft_line() -> np.ndarray:
+    line = np.full(160, 0.05, dtype=np.float64)
+    line[50:60] = np.linspace(0.05, 0.85, 10)
+    line[60:100] = 0.85
+    line[100:110] = np.linspace(0.85, 0.05, 10)
+    return line

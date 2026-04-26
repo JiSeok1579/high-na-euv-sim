@@ -1,0 +1,90 @@
+name: Auto-Merge
+
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize, ready_for_review, labeled]
+  pull_request_review:
+    types: [submitted]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Pull request number to enable native auto-merge for"
+        required: true
+        type: number
+
+jobs:
+  enable-auto-merge:
+    name: Enable native auto-merge
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request_review' || github.event.review.state == 'approved'
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: read
+    concurrency:
+      group: auto-merge-${{ github.event.pull_request.number || inputs.pr_number }}
+      cancel-in-progress: false
+    steps:
+      - name: Enable auto-merge for labeled PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AUTO_MERGE_LABEL: auto-merge
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${PR_NUMBER}" ]; then
+            echo "No PR number was provided by the event."
+            exit 1
+          fi
+
+          state="$(gh pr view "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json state --jq '.state')"
+          if [ "${state}" != "OPEN" ]; then
+            echo "PR #${PR_NUMBER} is ${state}; skipping."
+            exit 0
+          fi
+
+          draft="$(gh pr view "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json isDraft --jq '.isDraft')"
+          if [ "${draft}" = "true" ]; then
+            echo "PR #${PR_NUMBER} is a draft; skipping."
+            exit 0
+          fi
+
+          has_label="$(
+            gh pr view "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json labels --jq '.labels[].name' \
+              | grep -Fx "${AUTO_MERGE_LABEL}" || true
+          )"
+          if [ -z "${has_label}" ]; then
+            echo "PR #${PR_NUMBER} does not have the '${AUTO_MERGE_LABEL}' label; skipping."
+            exit 0
+          fi
+
+          pr_title="$(gh pr view "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json title --jq '.title')"
+          phase_pattern='^phase[0-9]+-part[0-9]{2}-(add|update|fix|refactor|docs|test|audit|chore): .{12,}$'
+          scope_pattern='^[a-z0-9][a-z0-9-]*-(add|update|fix|refactor|docs|test|audit|chore): .{12,}$'
+          if [[ ! "${pr_title}" =~ ${phase_pattern} && ! "${pr_title}" =~ ${scope_pattern} ]]; then
+            echo "PR title is not a clear merge title: ${pr_title}"
+            echo "Use: phase<phase>-part<NN>-<kind>: <clear summary>"
+            echo "Or:  <scope>-<kind>: <clear summary>"
+            exit 1
+          fi
+
+          auto_merge_subject="$(gh pr view "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json autoMergeRequest --jq '.autoMergeRequest.commitHeadline // ""')"
+          if [ -n "${auto_merge_subject}" ]; then
+            if [ "${auto_merge_subject}" = "${pr_title}" ]; then
+              echo "Native auto-merge is already enabled for PR #${PR_NUMBER} with the current title."
+              exit 0
+            fi
+
+            echo "Updating native auto-merge title for PR #${PR_NUMBER}."
+            gh pr merge "${PR_NUMBER}" --disable-auto --repo "${GITHUB_REPOSITORY}"
+          fi
+
+          head_owner="$(gh pr view "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json headRepositoryOwner --jq '.headRepositoryOwner.login')"
+          merge_args=("${PR_NUMBER}" --auto --squash --subject "${pr_title}" --body "Auto-merged after required checks passed." --repo "${GITHUB_REPOSITORY}")
+          if [ "${head_owner}" = "${GITHUB_REPOSITORY_OWNER}" ]; then
+            merge_args+=(--delete-branch)
+          fi
+
+          echo "Enabling GitHub native auto-merge for PR #${PR_NUMBER}."
+          gh pr merge "${merge_args[@]}"

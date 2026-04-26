@@ -1,0 +1,147 @@
+"""Pupil function for the projection optics.
+
+Implements the annular pupil with optional central obscuration and
+Zernike-polynomial wavefront aberration. The pupil is sampled on a square
+frequency-domain grid of normalized spatial frequencies (f_x, f_y) where
+the unit circle corresponds to the system NA.
+
+Conventions
+-----------
+- Normalized pupil radius rho = sqrt(f_x^2 + f_y^2) / NA.
+- Pupil amplitude is 1 inside the annulus and 0 outside.
+- Aberration adds a phase exp(i · 2π · W / lambda), where W is the
+  optical path difference produced by the Zernike series at (rho, theta).
+
+Reference
+---------
+- physics_considerations.md Part E (Fourier optics)
+- 진행계획서.md §4.1 WP1.2
+- Paper #15 (central obscuration), #19 (anamorphic)
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from math import factorial
+from typing import Mapping
+
+import numpy as np
+
+from . import constants as C
+
+
+ZernikeCoeffs = Mapping[tuple[int, int], float]
+
+
+@dataclass(frozen=True)
+class PupilSpec:
+    """Container describing the pupil sampling and physics."""
+
+    grid_size: int
+    na: float = C.NA_HIGH
+    obscuration_ratio: float = C.DEFAULT_OBSCURATION_RATIO
+    wavelength: float = C.LAMBDA_EUV
+    zernike: ZernikeCoeffs = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if self.grid_size <= 0 or self.grid_size % 2 != 0:
+            raise ValueError("grid_size must be a positive even integer")
+        if not 0.0 < self.na <= 1.0:
+            raise ValueError("na must be in (0, 1]")
+        if not 0.0 <= self.obscuration_ratio < 1.0:
+            raise ValueError("obscuration_ratio must be in [0, 1)")
+        if self.wavelength <= 0.0:
+            raise ValueError("wavelength must be positive")
+
+
+def _frequency_grid(grid_size: int) -> tuple[np.ndarray, np.ndarray]:
+    """Return centered frequency coordinates normalized to [-1, 1]."""
+    axis = np.linspace(-1.0, 1.0, grid_size, endpoint=False)
+    fx, fy = np.meshgrid(axis, axis, indexing="xy")
+    return fx, fy
+
+
+def _zernike_polynomial(n: int, m: int, rho: np.ndarray, theta: np.ndarray) -> np.ndarray:
+    """Compute a single Noll-style Zernike polynomial Z_n^m on (rho, theta).
+
+    Uses the standard normalization with R_n^|m|(rho) radial polynomials.
+    Returns 0 outside rho > 1.
+    """
+    abs_m = abs(m)
+    if (n - abs_m) % 2 != 0 or n < abs_m:
+        raise ValueError(f"invalid Zernike index n={n}, m={m}")
+
+    radial = np.zeros_like(rho)
+    for k in range((n - abs_m) // 2 + 1):
+        coeff = (-1) ** k
+        coeff *= factorial(n - k)
+        coeff /= (
+            factorial(k)
+            * factorial((n + abs_m) // 2 - k)
+            * factorial((n - abs_m) // 2 - k)
+        )
+        radial += coeff * rho ** (n - 2 * k)
+
+    if m > 0:
+        z = radial * np.cos(m * theta)
+    elif m < 0:
+        z = radial * np.sin(abs_m * theta)
+    else:
+        z = radial
+
+    z[rho > 1.0] = 0.0
+    return z
+
+
+def _wavefront(
+    rho: np.ndarray,
+    theta: np.ndarray,
+    zernike: ZernikeCoeffs,
+) -> np.ndarray:
+    """Sum Zernike contributions into the OPD wavefront W (in waves)."""
+    if not zernike:
+        return np.zeros_like(rho)
+    w = np.zeros_like(rho)
+    for (n, m), coeff in zernike.items():
+        w += coeff * _zernike_polynomial(n, m, rho, theta)
+    return w
+
+
+def build_pupil(spec: PupilSpec) -> np.ndarray:
+    """Construct the complex pupil function P(f_x, f_y).
+
+    Returns
+    -------
+    pupil : (N, N) complex ndarray
+        Centered pupil, where pupil[N/2, N/2] is the (0, 0) frequency.
+        Magnitude is 1 inside the annulus (NA·ε ≤ rho_phys ≤ NA), 0 outside.
+        Phase encodes the Zernike wavefront via exp(i·2π·W).
+    """
+    fx, fy = _frequency_grid(spec.grid_size)
+    rho = np.sqrt(fx**2 + fy**2)
+    theta = np.arctan2(fy, fx)
+
+    inside = rho <= 1.0
+    outside_obscuration = rho >= spec.obscuration_ratio
+    annulus = inside & outside_obscuration
+
+    amplitude = annulus.astype(np.float64)
+
+    if spec.zernike:
+        w_waves = _wavefront(rho, theta, spec.zernike)
+        phase = np.exp(1j * 2.0 * np.pi * w_waves)
+    else:
+        phase = np.ones_like(amplitude, dtype=np.complex128)
+
+    return (amplitude * phase).astype(np.complex128)
+
+
+def pupil_metrics(pupil: np.ndarray) -> dict[str, float]:
+    """Quick summary metrics for a pupil array (filling fraction, energy)."""
+    mag = np.abs(pupil)
+    n_open = float(np.count_nonzero(mag > 0))
+    n_total = float(mag.size)
+    return {
+        "fill_fraction": n_open / n_total,
+        "energy": float(np.sum(mag**2)),
+    }

@@ -1,0 +1,18 @@
+# 한국어 파일명 보존
+* text=auto eol=lf
+
+*.md text
+*.py text
+*.yml text
+*.yaml text
+*.txt text
+
+# Notebooks: line-by-line diff 가능하게
+*.ipynb text
+
+# Binary
+*.docx binary
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary

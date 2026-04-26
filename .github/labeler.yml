@@ -1,0 +1,55 @@
+phase-1:
+  - changed-files:
+    - any-glob-to-any-file:
+      - src/pupil.py
+      - src/mask.py
+      - src/aerial.py
+      - src/constants.py
+      - tests/phase1_*
+
+phase-2:
+  - changed-files:
+    - any-glob-to-any-file:
+      - src/illuminator.py
+      - tests/phase2_*
+
+phase-3:
+  - changed-files:
+    - any-glob-to-any-file:
+      - src/wafer_topo.py
+      - tests/phase3_*
+
+phase-4:
+  - changed-files:
+    - any-glob-to-any-file:
+      - src/mask_3d.py
+      - tests/phase4_*
+      - data/absorber_nk/**
+
+phase-5:
+  - changed-files:
+    - any-glob-to-any-file:
+      - src/resist_*.py
+      - tests/phase5_*
+
+phase-6:
+  - changed-files:
+    - any-glob-to-any-file:
+      - src/smo.py
+      - src/pmwo.py
+      - src/opc.py
+      - src/metrics.py
+      - tests/phase6_*
+
+audit:
+  - changed-files:
+    - any-glob-to-any-file:
+      - audits/**/*
+
+documentation:
+  - changed-files:
+    - any-glob-to-any-file:
+      - docs/**/*
+      - PROJECT_OVERVIEW.md
+      - 진행계획서.md
+      - 논문/**/*

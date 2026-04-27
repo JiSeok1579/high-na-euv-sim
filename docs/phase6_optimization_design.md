@@ -3,15 +3,18 @@
 ## Scope
 
 Phase 6 Part 01 added a study-grade source-mask optimization (SMO) MVP. Phase 6
-Part 02 extends that loop with PMWO/OPC candidate families and row-wise 2-D EPE
-maps. The implementation closes the simulator loop by evaluating:
+Part 02 extended that loop with PMWO/OPC candidate families and row-wise 2-D EPE
+maps. Phase 6 Part 03 adds a numeric-gradient ILT refinement path and
+full-layout contour EPE. The implementation closes the simulator loop by
+evaluating:
 
 - mask candidates,
 - Phase 2 source shapes,
 - OPC bias candidates,
 - pupil and wavefront candidates,
 - dose candidates,
-- Phase 5 stochastic LWR budget penalties.
+- Phase 5 stochastic LWR budget penalties,
+- finite-difference bias-gradient updates.
 
 The optimizer is deterministic grid search. This is intentionally simpler than
 industrial SMO, PMWO, OPC, or ILT, but it gives the project a complete
@@ -68,6 +71,23 @@ Phase 6 Part 02 adds `src/pmwo.py`:
 The PMWO loss uses the same CD/LWR/dose terms as Part 01, but replaces the
 center-line EPE term with the mean absolute value from the 2-D EPE map.
 
+## ILT / Numeric-Gradient Extension
+
+Phase 6 Part 03 adds `src/ilt.py`:
+
+- `full_layout_contour_epe()` compares target and printed contour transitions
+  along both image axes.
+- `evaluate_ilt_bias_candidate()` evaluates one scalar OPC/ILT mask-bias point
+  with the full-layout contour EPE term.
+- `finite_difference_bias_gradient()` estimates `d(loss)/d(mask_bias)` with a
+  bounded finite difference.
+- `ilt_bias_gradient_refinement()` walks a poor mask-bias point toward lower
+  contour loss using deterministic finite-difference descent.
+
+This is not a production ILT engine. It is the first numeric-gradient hook that
+keeps the optimization path inspectable while proving that the simulator can
+refine a mask parameter using the same forward model and objective stack.
+
 ## Implemented APIs
 
 - `SMOObjectiveWeights`
@@ -84,6 +104,10 @@ center-line EPE term with the mean absolute value from the 2-D EPE map.
 - `pupil_obscuration_candidates()`
 - `edge_placement_error_map_2d()`
 - `pmwo_grid_search()`
+- `full_layout_contour_epe()`
+- `evaluate_ilt_bias_candidate()`
+- `finite_difference_bias_gradient()`
+- `ilt_bias_gradient_refinement()`
 
 ## Simplifications
 
@@ -92,9 +116,11 @@ center-line EPE term with the mean absolute value from the 2-D EPE map.
 | P6-L1 | Deterministic grid search instead of gradient descent | Keeps the first SMO loop inspectable and stable. |
 | P6-L2 | Line-space mask helper for the MVP demo | Enough to verify target-to-mask optimization before contact-array and ILT work. |
 | P6-L3 | Threshold resist print check inside the objective | Reuses the existing end-to-end MVP path without adding a new resist abstraction. |
-| P6-L4 | Scalar CD/LWR plus row-wise 2-D EPE objective | Enough to expose PMWO/OPC trends before full layout contour extraction. |
+| P6-L4 | Scalar CD/LWR plus row-wise 2-D EPE objective | Enough to expose PMWO/OPC trends before polygon-level contour extraction. |
 | P6-L5 | OPC represented as line-space mask bias | Keeps candidate generation deterministic while preserving the mask-bias control axis. |
 | P6-L6 | Pupil/wavefront candidates are discrete sweeps | Replaces autograd PMWO with inspectable grid search for the study-grade gate. |
+| P6-L7 | ILT gradient is finite-difference over one mask-bias parameter | Provides a stable numeric-gradient hook before continuous pixel-level ILT. |
+| P6-L8 | Full-layout contour EPE uses row/column binary transitions | Captures x/y contour drift without requiring polygon contour tracing yet. |
 
 ## Verification
 
@@ -107,6 +133,8 @@ The Phase 6 test suite checks:
 - OPC bias candidate generation,
 - pupil and Zernike wavefront candidate generation,
 - 2-D EPE zero-map and candidate ranking,
+- full-layout x/y contour EPE extraction,
+- finite-difference gradient sign and descent improvement,
 - input validation before optimization.
 
 Current implementation files:
@@ -115,5 +143,7 @@ Current implementation files:
 - `tests/phase6_smo.py`
 - `src/pmwo.py`
 - `tests/phase6_pmwo.py`
+- `src/ilt.py`
+- `tests/phase6_ilt.py`
 - `notebooks/5_SMO_PMWO.ipynb`
 - `docs/phase6_optimization_design.md`

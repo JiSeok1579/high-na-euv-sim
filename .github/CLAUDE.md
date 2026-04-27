@@ -20,6 +20,33 @@ step.
 - `audits/04_simulation/INSTRUCTIONS.md`
 - `논문/papers/KNOWLEDGE.md` — integrated knowledge from 21 papers
 - `high_na_euv_physics_considerations.md` — physics handbook
+- `docs/study_grade_relaxation.md` — study-purpose audit relaxation policy
+
+## Audit Grade — Study Purpose Acknowledgment
+
+This project is a **study-purpose simulator**. It is not a paper, report, or
+industry deployment tool. External audits must apply study-grade severity:
+
+### P0/P1 Items Still Allowed
+
+- Test pass rate below 100%.
+- Sign-convention violations, including defocus, anamorphic mapping, and CRA.
+- Unit inconsistency, especially meters vs nanometers or radians vs waves.
+- Dishonest `AUDIT_LOG.md` entries or false mitigation closure.
+- Metadata sync drift between `REVIEWER_DIRECTIVE.md`, `.github/CLAUDE.md`, and
+  the active study-grade policy.
+
+### Do Not Raise As P0 In Study Grade
+
+- Simplification four-way tracking below 100%, down to roughly 80%.
+- Missing mypy strict mode.
+- Missing industry-grade quantitative validation or ground truth.
+- Missing paper #20/#21 quantitative reproduction.
+- Missing `CONTRIBUTING.md`.
+- Small `_validate_*` duplication or similar low-impact code hygiene issues.
+
+This relaxation keeps the study value intact: build first, visualize in 3D,
+inspect behavior, and refine after learning from the result.
 
 ## PR Audit Procedure
 

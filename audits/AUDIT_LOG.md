@@ -19,6 +19,7 @@
 
 | 날짜 | Phase | 역할 | 주제 | 판정 | 보고서 | 비고 |
 |------|-------|------|------|------|--------|------|
+| 2026-04-27 | Phase 6 | implementation | Phase 6 Part 04 assist-feature OPC + pixel-level ILT | 🟢 PASS | [docs/phase6_optimization_design.md](../docs/phase6_optimization_design.md) | `src/opc.py`, assist-feature masks, arbitrary OPC mask contour evaluation, pixel-level ILT refinement, notebook expansion, remaining-work checklist, and 5 Phase 6 OPC tests added. 118/118 tests PASS. nbconvert execution PASS |
 | 2026-04-27 | Phase 6 | implementation | Phase 6 Part 03 ILT gradient + full-layout contour EPE | 🟢 PASS | [docs/phase6_optimization_design.md](../docs/phase6_optimization_design.md) | `src/ilt.py`, full-layout x/y contour EPE, finite-difference mask-bias gradient, ILT refinement, notebook expansion, and 5 Phase 6 ILT tests added. 113/113 tests PASS. nbconvert execution PASS |
 | 2026-04-27 | Phase 6 | implementation | Phase 6 Part 02 PMWO/OPC candidates + 2-D EPE maps | 🟢 PASS | [docs/phase6_optimization_design.md](../docs/phase6_optimization_design.md) | `src/pmwo.py`, OPC bias masks, pupil/wavefront candidates, row-wise 2-D EPE maps, PMWO grid search, notebook expansion, and 5 Phase 6 PMWO tests added. 108/108 tests PASS. nbconvert execution PASS |
 | 2026-04-27 | Phase 6 | implementation | Phase 6 Part 01 SMO source + LWR objective MVP | 🟢 PASS | [docs/phase6_optimization_design.md](../docs/phase6_optimization_design.md) | `src/smo.py`, source-mask-dose grid search, Phase 2 source variables, Phase 5 stochastic LWR objective, `5_SMO_PMWO` notebook, and 5 Phase 6 tests added. 103/103 tests PASS. nbconvert execution PASS |
@@ -57,8 +58,8 @@
 ## 통계 (자동 갱신 대상)
 
 ```
-총 감사 수:           32
-PASS:                29
+총 감사 수:           33
+PASS:                30
 PASS WITH P0:        3 (EXT-AUD-001/004/005)
 CAUTION:             0
 MAJOR RISK:          0
@@ -76,15 +77,15 @@ UNVERIFIED:          0
   P0 개수:             1 → 0 → 0 → 1 → 0 (MT-011 처리)
   P1 개수:             6 → 2 → 0 → 3 → 1 → 0 (MT-012 처리)
   Mitigation 처리율 (누적): — → 86% → 100% → 100% → 93% → 100% (14/14)
-  단위 테스트 수:       5 → 9 → 14 → 20 → 25 → 32 → 38 → 42 → 48 → 52 → 58 → 61 → 64 → 73 → 79 → 84 → 89 → 98 → 103 → 108 → 113 (+2160% 누적) ★
-  Test pass rate:      5/5 → 9/9 → 14/14 → 20/20 → 25/25 → 32/32 → 38/38 → 42/42 → 48/48 → 52/52 → 58/58 → 61/61 → 64/64 → 73/73 → 79/79 → 84/84 → 89/89 → 98/98 → 103/103 → 108/108 → 113/113 (100% 유지)
+  단위 테스트 수:       5 → 9 → 14 → 20 → 25 → 32 → 38 → 42 → 48 → 52 → 58 → 61 → 64 → 73 → 79 → 84 → 89 → 98 → 103 → 108 → 113 → 118 (+2260% 누적) ★
+  Test pass rate:      5/5 → 9/9 → 14/14 → 20/20 → 25/25 → 32/32 → 38/38 → 42/42 → 48/48 → 52/52 → 58/58 → 61/61 → 64/64 → 73/73 → 79/79 → 84/84 → 89/89 → 98/98 → 103/103 → 108/108 → 113/113 → 118/118 (100% 유지)
   KPI K3 (DOF):        0% → 0% → enabled → 50% → 100% → study-grade qualitative PASS ★
   KPI K4 (M3D 6):      0% → reduced six-effect + field boundary evidence ★
   KPI K1 (end-to-end): optical only → full MVP ★
   Phase 2 source:      pending → partial-coherence source-shape MVP enabled ★
-  KPI K5 (SMO):        pending → source-mask-dose grid-search MVP + LWR objective → PMWO/OPC + 2-D EPE maps → ILT finite-difference + full-layout contour EPE ★
-  KPI 평균 진척률:      33% → 33% → 33%+ → 42% → 50% → 58% → 61% → 63% → 65% → 67% → 70% → 72% → 75% → 78% → 82% → 86% → 90%
-  누적 단순화:          7 → 7 → 11 → 14 → 16 (P6-L7/L8 신규)
+  KPI K5 (SMO):        pending → source-mask-dose grid-search MVP + LWR objective → PMWO/OPC + 2-D EPE maps → ILT finite-difference + full-layout contour EPE → assist-feature OPC + pixel-level ILT ★
+  KPI 평균 진척률:      33% → 33% → 33%+ → 42% → 50% → 58% → 61% → 63% → 65% → 67% → 70% → 72% → 75% → 78% → 82% → 86% → 90% → 93%
+  누적 단순화:          7 → 7 → 11 → 14 → 16 → 18 (P6-L9/L10 신규)
   단순화 4중 기록률:    100% → 100% → 100% → 85% (study-grade P3 backlog; 80% 이상 허용)
 
 식별된 시스템 패턴:

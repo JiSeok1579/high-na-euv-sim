@@ -5,7 +5,8 @@
 Phase 6 Part 01 added a study-grade source-mask optimization (SMO) MVP. Phase 6
 Part 02 extended that loop with PMWO/OPC candidate families and row-wise 2-D EPE
 maps. Phase 6 Part 03 adds a numeric-gradient ILT refinement path and
-full-layout contour EPE. The implementation closes the simulator loop by
+full-layout contour EPE. Phase 6 Part 04 adds assist-feature OPC candidates and
+pixel-level ILT refinement. The implementation closes the simulator loop by
 evaluating:
 
 - mask candidates,
@@ -14,7 +15,8 @@ evaluating:
 - pupil and wavefront candidates,
 - dose candidates,
 - Phase 5 stochastic LWR budget penalties,
-- finite-difference bias-gradient updates.
+- finite-difference bias-gradient updates,
+- local binary mask-pixel updates.
 
 The optimizer is deterministic grid search. This is intentionally simpler than
 industrial SMO, PMWO, OPC, or ILT, but it gives the project a complete
@@ -88,6 +90,24 @@ This is not a production ILT engine. It is the first numeric-gradient hook that
 keeps the optimization path inspectable while proving that the simulator can
 refine a mask parameter using the same forward model and objective stack.
 
+## Assist-Feature OPC / Pixel ILT Extension
+
+Phase 6 Part 04 adds `src/opc.py`:
+
+- `assist_feature_mask_candidates()` builds symmetric sub-resolution assist-bar
+  candidates for line-space layouts.
+- `assist_feature_line_space_pattern()` creates one deterministic assist-feature
+  mask pattern.
+- `evaluate_opc_mask_candidate()` evaluates arbitrary binary OPC masks with the
+  same full-layout contour objective.
+- `pixel_level_ilt_refinement()` applies local target-vs-print mismatch updates
+  to binary mask pixels and accepts only loss-reducing candidates.
+
+The pixel-level refinement is intentionally conservative: it does not introduce
+autograd or grayscale mask manufacturing rules. It proves that the simulator can
+move from scalar bias refinement to local mask-shape edits while preserving the
+same source, pupil, resist, contour-EPE, and loss stack.
+
 ## Implemented APIs
 
 - `SMOObjectiveWeights`
@@ -108,6 +128,10 @@ refine a mask parameter using the same forward model and objective stack.
 - `evaluate_ilt_bias_candidate()`
 - `finite_difference_bias_gradient()`
 - `ilt_bias_gradient_refinement()`
+- `assist_feature_mask_candidates()`
+- `assist_feature_line_space_pattern()`
+- `evaluate_opc_mask_candidate()`
+- `pixel_level_ilt_refinement()`
 
 ## Simplifications
 
@@ -121,6 +145,8 @@ refine a mask parameter using the same forward model and objective stack.
 | P6-L6 | Pupil/wavefront candidates are discrete sweeps | Replaces autograd PMWO with inspectable grid search for the study-grade gate. |
 | P6-L7 | ILT gradient is finite-difference over one mask-bias parameter | Provides a stable numeric-gradient hook before continuous pixel-level ILT. |
 | P6-L8 | Full-layout contour EPE uses row/column binary transitions | Captures x/y contour drift without requiring polygon contour tracing yet. |
+| P6-L9 | Assist features are symmetric line-space absorber bars | Captures an OPC control axis without general curvilinear mask synthesis. |
+| P6-L10 | Pixel-level ILT uses binary target-vs-print mismatch updates | Enables local mask edits before grayscale/autograd/pixel-manufacturing constraints. |
 
 ## Verification
 
@@ -135,6 +161,9 @@ The Phase 6 test suite checks:
 - 2-D EPE zero-map and candidate ranking,
 - full-layout x/y contour EPE extraction,
 - finite-difference gradient sign and descent improvement,
+- assist-feature mask generation,
+- arbitrary OPC mask contour evaluation,
+- pixel-level ILT loss reduction from a biased mask,
 - input validation before optimization.
 
 Current implementation files:
@@ -145,5 +174,7 @@ Current implementation files:
 - `tests/phase6_pmwo.py`
 - `src/ilt.py`
 - `tests/phase6_ilt.py`
+- `src/opc.py`
+- `tests/phase6_opc.py`
 - `notebooks/5_SMO_PMWO.ipynb`
 - `docs/phase6_optimization_design.md`

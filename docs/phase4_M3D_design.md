@@ -34,14 +34,36 @@ The starter material list is duplicated in code and data:
 The numbers are qualitative defaults. They should not be used as measured
 material data.
 
+`load_absorber_materials_json(...)` reads the same schema from disk, accepting
+either `thickness_m` or `thickness_nm`. This keeps the starter data replaceable
+by measured 13.5 nm n,k rows without changing the simulator API.
+
+## Part 02 Field-Level Boundary Correction
+
+`boundary_corrected_mask(...)` upgrades the Part 01 scalar checklist into a
+complex mask field that can feed the existing aerial-image solver. It returns a
+`BoundaryCorrectionResult` with:
+
+- `baseline_field`: the Phase 1 Kirchhoff thin-mask field.
+- `corrected_field`: the reduced Mask 3D corrected complex field.
+- `shadow_map`: incident-side boundary attenuation from oblique CRA.
+- `phase_map_radians`: absorber phase perturbation localized to clear boundary
+  pixels.
+- `secondary_field`: shifted weak ghost field from absorber top reflection.
+- `summary`: the same six-effect scalar checklist for traceability.
+
+The correction remains local to absorber/clear boundaries. Zero CRA still
+collapses to the Kirchhoff baseline, which is the explicit in-line projector
+mitigation smoke test.
+
 ## Simplifications
 
 | ID | Simplification | Consequence | Future replacement |
 |---|---|---|---|
-| P4-L1 | Boundary-correction scalar model instead of RCWA/Maxwell. | Correct sign/trend only, not quantitative CD or NILS prediction. | RCWA or imported rigorous mask lookup tables. |
-| P4-L2 | Material optical constants are starter qualitative values. | Absorber ranking is a smoke test. | Measured n,k data at 13.5 nm. |
+| P4-L1 | Boundary-correction field model instead of RCWA/Maxwell. | Correct sign/trend only, not quantitative CD or NILS prediction. | RCWA or imported rigorous mask lookup tables. |
+| P4-L2 | Material optical constants are starter qualitative values unless loaded from JSON. | Absorber ranking is a smoke test before measured rows are supplied. | Measured n,k data at 13.5 nm. |
 | P4-L3 | Every effect scales to zero at zero CRA. | Useful for paper #3 in-line mitigation check but incomplete for phase-only stack effects. | Separate angle and stack-cavity terms. |
-| P4-L4 | Secondary images use a top-reflectivity proxy. | Ghost images are tracked as a scalar fraction only. | Field-level reflected-path model. |
+| P4-L4 | Secondary images use a shifted top-reflectivity proxy. | Ghost images are field-level but not physically propagated reflected paths. | Field-level reflected-path model. |
 
 ## Verification
 
@@ -54,8 +76,13 @@ unit tests:
 - Telecentricity error is pitch dependent.
 - High-k near-n=1 absorber reduces contrast loss and best-focus shift proxies.
 - Secondary image proxy scales with top reflectivity.
+- Boundary-corrected zero-CRA field equals the Kirchhoff baseline.
+- Boundary shadow maps move with CRA sign.
+- Boundary phase maps track absorber phase strength.
+- JSON absorber loading accepts measured-row replacement data.
 
 ## Exit State
 
-This PR opens Phase 4 Part 01. KPI K4 is not complete yet; the current status is
-six-effect stub coverage, not validated Mask 3D accuracy.
+Part 02 adds field-level boundary correction. KPI K4 is still qualitative:
+six-effect behavior and field interfaces are covered, but rigorous Mask 3D
+accuracy remains future work.

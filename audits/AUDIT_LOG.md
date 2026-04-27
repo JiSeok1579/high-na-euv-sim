@@ -19,6 +19,7 @@
 
 | 날짜 | Phase | 역할 | 주제 | 판정 | 보고서 | 비고 |
 |------|-------|------|------|------|--------|------|
+| 2026-04-27 | Phase 4 | implementation | Phase 4 Part 02 boundary-corrected Mask 3D field | 🟢 PASS | [docs/phase4_M3D_design.md](../docs/phase4_M3D_design.md) | `boundary_corrected_mask`, `BoundaryCorrectionResult`, and `load_absorber_materials_json` added. Zero-CRA Kirchhoff preservation, asymmetric shadowing, phase map, secondary field, and measured-row JSON loader tests added. 79/79 tests PASS |
 | 2026-04-27 | Phase 4 + meta | implementation | MT-015/016 closure + Phase 4 paper #12 six-effect stub | 🟢 PASS | [docs/phase4_M3D_design.md](../docs/phase4_M3D_design.md) | Simulator rebrand, `.github/CLAUDE.md` v2.1 English-first sync, Tier 1 matplotlib 3D notebooks, `src/mask_3d.py`, absorber starter data, and 9 Phase 4 Mask 3D tests. 73/73 tests PASS |
 | 2026-04-26 | Phase 5 | external (DS) | EXT-AUD-005 Full Resist Chain (자동 트리거 v2.1) | 🟡 PASS w/ 1 P0 (rebrand) | [00_FINAL_audit.md](external/reports/EXT-AUD-2026-04-26-005_phase5_full_resist_chain/00_FINAL_audit.md) | **본 프로젝트 단일 최대 진척 외부 검증**: 4-level resist + KPI K1 진정 100% + K6 70% + k₂ fitting closed. 64/64 tests PASS. user-directed legacy-name-to-Simulator rebrand + 3D 시각화 Tier 1 권고 instruction sheet 포함. MT-015~018 등록 |
 | 2026-04-26 | Phase 5 | implementation | Phase 5 complete calibration + K6 exit | 🟢 PASS | [docs/phase5_resist_models.md](../docs/phase5_resist_models.md) | L1 LWR, L2 SWA, L3 stochastic LWR measured-input calibration hooks 추가. K6 exit 상태 반영. 64/64 tests PASS |
@@ -48,8 +49,8 @@
 ## 통계 (자동 갱신 대상)
 
 ```
-총 감사 수:           23
-PASS:                20
+총 감사 수:           24
+PASS:                21
 PASS WITH P0:        3 (EXT-AUD-001/004/005)
 CAUTION:             0
 MAJOR RISK:          0
@@ -67,9 +68,10 @@ UNVERIFIED:          0
   P0 개수:             1 → 0 → 0 → 1 → 0 (MT-011 처리)
   P1 개수:             6 → 2 → 0 → 3 → 1 → 0 (MT-012 처리)
   Mitigation 처리율 (누적): — → 86% → 100% → 100% → 93% → 100% (14/14)
-  단위 테스트 수:       5 → 9 → 14 → 20 → 25 → 32 → 38 → 42 → 48 → 52 → 58 → 61 → 64 → 73 (+1360% 누적) ★
-  Test pass rate:      5/5 → 9/9 → 14/14 → 20/20 → 25/25 → 32/32 → 38/38 → 42/42 → 48/48 → 52/52 → 58/58 → 61/61 → 64/64 → 73/73 (100% 유지)
+  단위 테스트 수:       5 → 9 → 14 → 20 → 25 → 32 → 38 → 42 → 48 → 52 → 58 → 61 → 64 → 73 → 79 (+1480% 누적) ★
+  Test pass rate:      5/5 → 9/9 → 14/14 → 20/20 → 25/25 → 32/32 → 38/38 → 42/42 → 48/48 → 52/52 → 58/58 → 61/61 → 64/64 → 73/73 → 79/79 (100% 유지)
   KPI K3 (DOF 정량):   0% → 0% → enabled → 50% → 100% ★
+  KPI K4 (M3D 6):      0% → reduced six-effect + field boundary evidence ★
   KPI K1 (end-to-end): optical only → full MVP ★
   KPI 평균 진척률:      33% → 33% → 33%+ → 42% → 50% → 58% → 61% → 63% → 65% → 67% → 70% → 72% → 75%
   누적 단순화:          7 → 7 → 11 → 13 (P3-L5/L6 신규)

@@ -2,14 +2,20 @@
 
 from __future__ import annotations
 
+import json
+
+import numpy as np
 import pytest
 
+from src.mask import MaskGrid, kirchhoff_mask, line_space_pattern
 from src.mask_3d import (
     NI_HIGH_K,
     TABN_REFERENCE,
     AbsorberMaterial,
+    boundary_corrected_mask,
     compare_absorber_materials,
     default_absorber_materials,
+    load_absorber_materials_json,
     mask3d_six_effects,
 )
 
@@ -111,3 +117,93 @@ def test_mask3d_input_validation():
         mask3d_six_effects(32e-9, orientation="diagonal")
     with pytest.raises(ValueError, match="materials"):
         compare_absorber_materials(32e-9, ())
+
+
+def test_boundary_corrected_mask_zero_cra_matches_kirchhoff():
+    """Part 02 preserves the Phase 1 thin-mask field for zero CRA."""
+    grid = MaskGrid(nx=64, ny=32, pixel_size=1e-9)
+    pattern = line_space_pattern(grid, pitch_m=16e-9)
+
+    result = boundary_corrected_mask(pattern, grid, 16e-9, chief_ray_angle_deg=0.0)
+
+    assert np.allclose(result.corrected_field, kirchhoff_mask(pattern))
+    assert np.count_nonzero(result.shadow_map) == 0
+    assert np.allclose(result.phase_map_radians, 0.0)
+    assert np.allclose(result.secondary_field, 0.0)
+
+
+def test_boundary_corrected_mask_applies_asymmetric_shadowing():
+    """The incident-side boundary attenuation changes with CRA sign."""
+    grid = MaskGrid(nx=64, ny=32, pixel_size=1e-9)
+    pattern = line_space_pattern(grid, pitch_m=16e-9)
+
+    positive = boundary_corrected_mask(pattern, grid, 16e-9, chief_ray_angle_deg=6.0)
+    negative = boundary_corrected_mask(pattern, grid, 16e-9, chief_ray_angle_deg=-6.0)
+
+    assert np.count_nonzero(positive.shadow_map) > 0
+    assert np.count_nonzero(negative.shadow_map) > 0
+    assert not np.allclose(positive.shadow_map, negative.shadow_map)
+    assert not np.allclose(positive.corrected_field, positive.baseline_field)
+
+
+def test_boundary_phase_map_tracks_absorber_phase_strength():
+    """Near-n=1 high-k material has a smaller boundary phase proxy."""
+    grid = MaskGrid(nx=64, ny=32, pixel_size=1e-9)
+    pattern = line_space_pattern(grid, pitch_m=16e-9)
+
+    tabn = boundary_corrected_mask(pattern, grid, 16e-9, material=TABN_REFERENCE)
+    high_k = boundary_corrected_mask(pattern, grid, 16e-9, material=NI_HIGH_K)
+
+    assert np.max(np.abs(tabn.phase_map_radians)) > np.max(
+        np.abs(high_k.phase_map_radians)
+    )
+
+
+def test_boundary_secondary_field_tracks_top_reflectivity():
+    """The field-level ghost term increases with absorber top reflection."""
+    grid = MaskGrid(nx=64, ny=32, pixel_size=1e-9)
+    pattern = line_space_pattern(grid, pitch_m=16e-9)
+    reflective = AbsorberMaterial("reflective", 0.94, 0.03, 60e-9, 0.05)
+    muted = AbsorberMaterial("muted", 0.94, 0.03, 60e-9, 0.002)
+
+    high = boundary_corrected_mask(pattern, grid, 16e-9, material=reflective)
+    low = boundary_corrected_mask(pattern, grid, 16e-9, material=muted)
+
+    assert np.linalg.norm(high.secondary_field) > np.linalg.norm(low.secondary_field)
+
+
+def test_load_absorber_materials_json_accepts_measured_rows(tmp_path):
+    """Measured n,k rows can replace starter constants without API changes."""
+    material_path = tmp_path / "absorbers.json"
+    material_path.write_text(
+        json.dumps(
+            {
+                "materials": [
+                    {
+                        "name": "measured candidate",
+                        "n": 0.97,
+                        "k": 0.08,
+                        "thickness_nm": 44.0,
+                        "top_reflectivity": 0.011,
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    materials = load_absorber_materials_json(material_path)
+
+    assert len(materials) == 1
+    assert materials[0].name == "measured candidate"
+    assert materials[0].thickness_m == pytest.approx(44e-9)
+
+
+def test_boundary_corrected_mask_rejects_grid_shape_mismatch():
+    """Field-level correction requires explicit grid/mask consistency."""
+    grid = MaskGrid(nx=64, ny=32, pixel_size=1e-9)
+    pattern = line_space_pattern(grid, pitch_m=16e-9)
+    wrong_grid = MaskGrid(nx=32, ny=32, pixel_size=1e-9)
+
+    with pytest.raises(ValueError, match="pattern shape"):
+        boundary_corrected_mask(pattern, wrong_grid, 16e-9)

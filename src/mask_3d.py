@@ -9,12 +9,15 @@ interface before a higher-fidelity electromagnetic model is introduced.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 import math
+from pathlib import Path
 from typing import Iterable
 
 import numpy as np
 
 from . import constants as C
+from .mask import MaskGrid, kirchhoff_mask
 
 
 @dataclass(frozen=True)
@@ -56,6 +59,19 @@ class Mask3DEffectSummary:
         )
 
 
+@dataclass(frozen=True)
+class BoundaryCorrectionResult:
+    """Field-level reduced Mask 3D boundary correction output."""
+
+    baseline_field: np.ndarray
+    corrected_field: np.ndarray
+    shadow_map: np.ndarray
+    phase_map_radians: np.ndarray
+    secondary_field: np.ndarray
+    summary: Mask3DEffectSummary
+    ghost_shift_px: int
+
+
 TABN_REFERENCE = AbsorberMaterial(
     name="TaBN reference",
     n=0.94,
@@ -84,6 +100,41 @@ RUTA_LOW_N_PSM = AbsorberMaterial(
 def default_absorber_materials() -> tuple[AbsorberMaterial, ...]:
     """Return the Phase 4 starter absorber library."""
     return (TABN_REFERENCE, NI_HIGH_K, RUTA_LOW_N_PSM)
+
+
+def load_absorber_materials_json(path: str | Path) -> tuple[AbsorberMaterial, ...]:
+    """Load absorber materials from a JSON material library.
+
+    Rows may specify either `thickness_m` or `thickness_nm`. The loader is
+    intentionally small so measured n,k rows can replace the starter qualitative
+    values without changing the Phase 4 code interface.
+    """
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    rows = data.get("materials")
+    if not isinstance(rows, list) or not rows:
+        raise ValueError("materials JSON must contain a non-empty materials list")
+
+    materials: list[AbsorberMaterial] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError("each material row must be a JSON object")
+        if "thickness_m" in row:
+            thickness_m = float(row["thickness_m"])
+        elif "thickness_nm" in row:
+            thickness_m = float(row["thickness_nm"]) * 1.0e-9
+        else:
+            raise ValueError("material row must include thickness_m or thickness_nm")
+
+        material = AbsorberMaterial(
+            name=str(row.get("name", "")),
+            n=float(row["n"]),
+            k=float(row["k"]),
+            thickness_m=thickness_m,
+            top_reflectivity=float(row.get("top_reflectivity", 0.015)),
+        )
+        _validate_material(material)
+        materials.append(material)
+    return tuple(materials)
 
 
 def mask3d_six_effects(
@@ -146,6 +197,90 @@ def mask3d_six_effects(
     )
 
 
+def boundary_corrected_mask(
+    pattern: np.ndarray,
+    grid: MaskGrid,
+    pitch_m: float,
+    *,
+    material: AbsorberMaterial = TABN_REFERENCE,
+    chief_ray_angle_deg: float = 6.0,
+    orientation: str = "vertical",
+    absorber_fraction: float | None = None,
+    ghost_shift_px: int = 1,
+) -> BoundaryCorrectionResult:
+    """Apply reduced field-level Mask 3D boundary correction to a binary mask.
+
+    The baseline is the Phase 1 Kirchhoff field. Corrections are localized to
+    clear pixels adjacent to absorber boundaries: shadowing attenuates the
+    incident-side boundary, absorber phase perturbs the edge field, and the
+    secondary-image term adds a shifted weak ghost field. This is still a
+    qualitative scaffold, but it returns the same complex field type expected by
+    `aerial_image`.
+    """
+    baseline = kirchhoff_mask(pattern)
+    absorber = _as_absorber_mask(pattern, expected_shape=grid.shape())
+    if absorber_fraction is None:
+        absorber_fraction = float(np.mean(absorber))
+    if not 0.0 < absorber_fraction < 1.0:
+        raise ValueError("absorber_fraction must be in (0, 1)")
+    if ghost_shift_px < 0:
+        raise ValueError("ghost_shift_px must be non-negative")
+
+    summary = mask3d_six_effects(
+        pitch_m,
+        material=material,
+        chief_ray_angle_deg=chief_ray_angle_deg,
+        orientation=orientation,
+        absorber_fraction=absorber_fraction,
+    )
+
+    clear = ~absorber
+    axis = 1 if orientation == "vertical" else 0
+    incidence_shift = 1 if chief_ray_angle_deg >= 0.0 else -1
+    incident_absorber = _shift_bool(absorber, incidence_shift, axis=axis)
+    boundary_clear = clear & _edge_neighbor_mask(absorber)
+    shadow_region = clear & incident_absorber
+
+    shadow_map = np.zeros(grid.shape(), dtype=np.float64)
+    shadow_map[shadow_region] = summary.shadowing_loss_fraction
+
+    signed_phase = math.copysign(
+        2.0 * math.pi * summary.phase_error_waves,
+        chief_ray_angle_deg if chief_ray_angle_deg != 0.0 else 1.0,
+    )
+    phase_map = np.zeros(grid.shape(), dtype=np.float64)
+    phase_map[boundary_clear] = signed_phase
+
+    amplitude = np.abs(baseline)
+    amplitude *= 1.0 - shadow_map
+    amplitude[boundary_clear] *= 1.0 - 0.5 * summary.contrast_loss_fraction
+    corrected = amplitude * np.exp(1j * phase_map)
+
+    if ghost_shift_px == 0 or summary.secondary_image_fraction == 0.0:
+        secondary = np.zeros_like(baseline)
+    else:
+        secondary = (
+            summary.secondary_image_fraction
+            * _shift_complex(
+                baseline,
+                incidence_shift * ghost_shift_px,
+                axis=axis,
+            )
+            * np.exp(1j * signed_phase)
+        )
+    corrected = (corrected + secondary).astype(np.complex128)
+
+    return BoundaryCorrectionResult(
+        baseline_field=baseline,
+        corrected_field=corrected,
+        shadow_map=shadow_map,
+        phase_map_radians=phase_map,
+        secondary_field=secondary.astype(np.complex128),
+        summary=summary,
+        ghost_shift_px=int(ghost_shift_px),
+    )
+
+
 def compare_absorber_materials(
     pitch_m: float,
     materials: Iterable[AbsorberMaterial] | None = None,
@@ -185,3 +320,55 @@ def _validate_material(material: AbsorberMaterial) -> None:
 def _validate_positive(value: float, name: str) -> None:
     if not np.isfinite(value) or value <= 0.0:
         raise ValueError(f"{name} must be a positive finite value")
+
+
+def _as_absorber_mask(pattern: np.ndarray, expected_shape: tuple[int, int]) -> np.ndarray:
+    arr = np.asarray(pattern)
+    if arr.shape != expected_shape:
+        raise ValueError("pattern shape must match MaskGrid.shape()")
+    if not np.all((arr == 0) | (arr == 1)):
+        raise ValueError("pattern must contain only 0 or 1")
+    mask = arr.astype(bool)
+    if np.all(mask) or not np.any(mask):
+        raise ValueError("pattern must contain both absorber and clear regions")
+    return mask
+
+
+def _edge_neighbor_mask(absorber: np.ndarray) -> np.ndarray:
+    neighbors = np.zeros_like(absorber, dtype=bool)
+    for axis in (0, 1):
+        neighbors |= _shift_bool(absorber, 1, axis=axis)
+        neighbors |= _shift_bool(absorber, -1, axis=axis)
+    return neighbors
+
+
+def _shift_bool(values: np.ndarray, shift: int, *, axis: int) -> np.ndarray:
+    return _shift_array(values, shift, axis=axis, fill_value=False).astype(bool)
+
+
+def _shift_complex(values: np.ndarray, shift: int, *, axis: int) -> np.ndarray:
+    return _shift_array(values, shift, axis=axis, fill_value=0.0 + 0.0j).astype(
+        np.complex128
+    )
+
+
+def _shift_array(
+    values: np.ndarray,
+    shift: int,
+    *,
+    axis: int,
+    fill_value: object,
+) -> np.ndarray:
+    if shift == 0:
+        return values.copy()
+    result = np.full(values.shape, fill_value, dtype=values.dtype)
+    source = [slice(None)] * values.ndim
+    destination = [slice(None)] * values.ndim
+    if shift > 0:
+        source[axis] = slice(0, -shift)
+        destination[axis] = slice(shift, None)
+    else:
+        source[axis] = slice(-shift, None)
+        destination[axis] = slice(0, shift)
+    result[tuple(destination)] = values[tuple(source)]
+    return result

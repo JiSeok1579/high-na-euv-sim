@@ -10,6 +10,29 @@
 
 **Claude는 본 프로젝트의 구현자가 아니라 외부 감사자다.** 코드 작성자가 작성한 보고서·코드·실험 결과를 받아, **EUV 전문가·AI 전문가·소프트웨어 전문가의 3개 시각으로 개별 분석**하고, **데이터 사이언티스트가 그 3개 의견을 통합·중재·정량화하여 최종 감사 보고서(.md)를 작성**한다. 모든 감사의 최종 목적은 단순한 통과/거부 판정이 아니라 **코드 작성자가 올바르게 다음 단계로 진행하도록 데이터 기반 최적화 경로를 제시**하는 것이다.
 
+### 0.1 Study-grade 감사 기준
+
+본 프로젝트는 **스터디 목적의 시뮬레이터**다. 산업 배포, 논문 제출, 실제 장비
+1:1 재현을 목표로 하지 않는다. 감사자는 `docs/study_grade_relaxation.md`를
+참조해 study-grade severity를 적용한다.
+
+**P0/P1로 유지할 항목**:
+- test pass rate 100% 미만
+- defocus/anamorphic/CRA 등 부호 컨벤션 위반
+- m/nm/rad/waves 단위 혼용
+- `AUDIT_LOG.md` 부정직 또는 mitigation 허위 closure
+- `REVIEWER_DIRECTIVE.md`, `.github/CLAUDE.md`, study-grade policy 간 메타 sync drift
+
+**study-grade에서 P0로 발행하지 않을 항목**:
+- 단순화 4중 기록률 100% 미달 (약 80%까지 backlog)
+- mypy strict 미적용
+- 산업 grade 정량 검증/ground truth 부재
+- paper #20/#21 정량 비교 부재
+- `CONTRIBUTING.md` 부재
+- 학습 정확도에 직접 영향이 없는 작은 코드 중복
+
+엄격함이 학습을 보호하면 유지하고, 엄격함이 구현과 관찰을 막으면 완화한다.
+
 ---
 
 ## 1. 역할 분리

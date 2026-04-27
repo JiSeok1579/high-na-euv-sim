@@ -19,6 +19,7 @@
 
 | 날짜 | Phase | 역할 | 주제 | 판정 | 보고서 | 비고 |
 |------|-------|------|------|------|--------|------|
+| 2026-04-27 | meta | policy | INST-001 study purpose + audit-grade relaxation | 🟢 PASS | [docs/study_grade_relaxation.md](../docs/study_grade_relaxation.md) | README, PROJECT_OVERVIEW, 진행계획서, REVIEWER_DIRECTIVE, and `.github/CLAUDE.md` now declare study purpose and study-grade severity. Workspace rename remains manual per INST-001. 89/89 tests PASS |
 | 2026-04-27 | Phase 4 | implementation | Phase 4 Part 04 rigorous-data import + aerial regression hooks | 🟢 PASS | [docs/phase4_M3D_design.md](../docs/phase4_M3D_design.md) | `load_mask3d_lookup_csv`, `lookup_boundary_corrected_mask`, `compare_mask3d_aerial_images`, `lookup_mask3d_aerial_regression`, and a rigorous import CSV template added. 89/89 tests PASS |
 | 2026-04-27 | Phase 4 | implementation | Phase 4 Part 03 absorber provenance + lookup-table hooks | 🟢 PASS | [docs/phase4_M3D_design.md](../docs/phase4_M3D_design.md) | `Mask3DLookupEntry`, `Mask3DLookupTable`, `AbsorberScreeningRow`, lookup JSON loading, pitch interpolation, reduced fallback, and candidate screening added. Absorber provenance fields added. 84/84 tests PASS |
 | 2026-04-27 | Phase 4 | implementation | Phase 4 Part 02 boundary-corrected Mask 3D field | 🟢 PASS | [docs/phase4_M3D_design.md](../docs/phase4_M3D_design.md) | `boundary_corrected_mask`, `BoundaryCorrectionResult`, and `load_absorber_materials_json` added. Zero-CRA Kirchhoff preservation, asymmetric shadowing, phase map, secondary field, and measured-row JSON loader tests added. 79/79 tests PASS |
@@ -51,8 +52,8 @@
 ## 통계 (자동 갱신 대상)
 
 ```
-총 감사 수:           26
-PASS:                23
+총 감사 수:           27
+PASS:                24
 PASS WITH P0:        3 (EXT-AUD-001/004/005)
 CAUTION:             0
 MAJOR RISK:          0
@@ -72,12 +73,12 @@ UNVERIFIED:          0
   Mitigation 처리율 (누적): — → 86% → 100% → 100% → 93% → 100% (14/14)
   단위 테스트 수:       5 → 9 → 14 → 20 → 25 → 32 → 38 → 42 → 48 → 52 → 58 → 61 → 64 → 73 → 79 → 84 → 89 (+1680% 누적) ★
   Test pass rate:      5/5 → 9/9 → 14/14 → 20/20 → 25/25 → 32/32 → 38/38 → 42/42 → 48/48 → 52/52 → 58/58 → 61/61 → 64/64 → 73/73 → 79/79 → 84/84 → 89/89 (100% 유지)
-  KPI K3 (DOF 정량):   0% → 0% → enabled → 50% → 100% ★
+  KPI K3 (DOF):        0% → 0% → enabled → 50% → 100% → study-grade qualitative PASS ★
   KPI K4 (M3D 6):      0% → reduced six-effect + field boundary evidence ★
   KPI K1 (end-to-end): optical only → full MVP ★
   KPI 평균 진척률:      33% → 33% → 33%+ → 42% → 50% → 58% → 61% → 63% → 65% → 67% → 70% → 72% → 75%
   누적 단순화:          7 → 7 → 11 → 14 (P4-L6 신규)
-  단순화 4중 기록률:    100% → 100% → 100% → 85% (drift 시작 — P3-L5/L6 명시 필요)
+  단순화 4중 기록률:    100% → 100% → 100% → 85% (study-grade P3 backlog; 80% 이상 허용)
 
 식별된 시스템 패턴:
   "Meta-sync drift" — REVIEWER_DIRECTIVE 변경 시 .github/CLAUDE.md sync 가 항상 P0
@@ -92,9 +93,10 @@ UNVERIFIED:          0
 
 | ID | 생성일 | 등급 | 내용 | 데드라인 | 출처 |
 |----|--------|------|------|----------|------|
-| MT-019 | 2026-04-26 | P2 | `_validate_*` helper 통합 → `src/utils.py` 또는 `src/_validation.py` (DRY) | Phase 4 entry 전 | EXT-AUD-005 §4.5 (REC-AI-01 + REC-SW-04 consensus) |
-| MT-020 | 2026-04-26 | P2 | `resist_stochastic.py` 539줄 모듈 분할 검토 (chain/budget/calibration) | 다음 정밀화 PR | EXT-AUD-005 §4.5 (REC-SW-05) |
-| MT-021 | 2026-04-26 | P2 | docs/phase5 에 threshold 0.25 (acid) vs 0.3 (intensity) 의미 차이 명시. depth absorption paper #20 정량 비교 | 다음 PR | EXT-AUD-005 §4.5 (REC-EUV-01/02) |
+| MT-019 | 2026-04-26 | P3 | `_validate_*` helper 통합 → `src/utils.py` 또는 `src/_validation.py` (DRY). Study-grade 재분류: correctness 영향 없음 | Backlog | EXT-AUD-005 §4.5 + INST-001 |
+| MT-020 | 2026-04-26 | P3 | `resist_stochastic.py` 모듈 분할 검토 (chain/budget/calibration). Study-grade 재분류: 유지보수 backlog | Backlog | EXT-AUD-005 §4.5 + INST-001 |
+| MT-021 | 2026-04-26 | P3 | docs/phase5 threshold 의미 차이와 depth absorption 정량 비교. Study-grade 재분류: 정량 비교는 stretch/backlog | Backlog | EXT-AUD-005 §4.5 + INST-001 |
+| MT-022 | 2026-04-27 | P1 | 3D notebooks parameter-sweep cells 확장: focus stack, pupil wavefront, resist depth | 다음 viz PR | INST-001 Task 5 |
 
 ---
 
@@ -115,7 +117,7 @@ UNVERIFIED:          0
 | **MT-011** | 2026-04-26 | P0 | `.github/CLAUDE.md` v2.1 sync — **MT-015 로 통합** | (재할당) |
 | **MT-012** | 2026-04-26 | P1 | k₂ fitting (3 신규 tests in Phase 5 PR) | `tests/phase3_DOF.py::test_k2_fit_*` (3 tests) |
 | MT-011 | 2026-04-26 | **P0** | `.github/CLAUDE.md` 를 REVIEWER_DIRECTIVE v2.1 자동 트리거 절차로 sync | `.github/CLAUDE.md` |
-| MT-012 | 2026-04-26 | P1 | k₂ fitting 보고 (NA/pitch sweep + DOF = k₂·λ/NA² 정량 검증, KPI K3 100% 합격선) | `src/dof.py`, `tests/phase3_DOF.py`, `docs/phase3_DOF_analysis.md` |
+| MT-012 | 2026-04-26 | P1 | k₂ fitting 보고 (NA/pitch sweep + DOF = k₂·λ/NA² formula/trend gate; former quantitative gate retained as stretch evidence) | `src/dof.py`, `tests/phase3_DOF.py`, `docs/phase3_DOF_analysis.md` |
 | MT-013 | 2026-04-26 | P1 | `진행계획서.md §13` v1.2 + v1.3 변경 이력 추가 | `진행계획서.md` |
 | MT-014 | 2026-04-26 | P1 | `docs/phase3_design.md §4` P3-L2 문구 갱신 | `docs/phase3_design.md` |
 | **MT-015** | 2026-04-27 | **P0** | Legacy project-name rebrand to High-NA EUV Lithography Simulator + `.github/CLAUDE.md` v2.1 English-first sync | `.github/CLAUDE.md`, `README.md`, docs, audit files, source docstrings |
